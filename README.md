@@ -8,3 +8,6 @@ To compile a file named `file_name.cpp` in the folder with path `big_folder/fold
 
 Then, to come back to the main terminal (to make commits!), do: `cd ..` as many times as it requires... or just choose the terminal manually (right area of terminal).
 
+
+To check where you are and what folders you have available do: `ls`.
+
