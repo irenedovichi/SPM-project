@@ -11,3 +11,6 @@ Then, to come back to the main terminal (to make commits!), do: `cd ..` as many 
 
 To check where you are and what folders you have available do: `ls`.
 
+
+One nice thing to know if you have to compile many (like thousands) C++ files: if you do `make -j` you compile everything in parallel, if you do `make -j n` you compile with n cores. So basically you can compile many programs in parallel.
+
