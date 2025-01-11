@@ -14,7 +14,6 @@ static inline void usage(const char *argv0) {
     std::printf("--------------------\n");
     std::printf("Usage: %s [options] file-or-directory [file-or-directory]\n", argv0);
     std::printf("\nOptions:\n");
-    std::printf(" -t set the \"BIG file\" low threshold (in Mbyte -- min. and default %ld Mbyte)\n", BIGFILE_LOW_THRESHOLD / (1024 * 1024));
     std::printf(" -r 0 does not recur, 1 will process the content of all subdirectories (default r=%d)\n", RECUR ? 1 : 0);
     std::printf(" -C compress: 0 preserves, 1 removes the original file (default C=%d)\n", REMOVE_ORIGIN ? 1 : 0);
     std::printf(" -D decompress: 0 preserves, 1 removes the original file (default D=%d)\n", REMOVE_ORIGIN ? 1 : 0);
@@ -24,31 +23,13 @@ static inline void usage(const char *argv0) {
 
 int parseCommandLine(int argc, char *argv[]) {
     extern char *optarg;
-    const std::string optstr="t:r:C:D:q:";
+    const std::string optstr="r:C:D:q:";
     
     long opt, start = 1;
     bool cpresent = false, dpresent = false; // flags for the presence of -C and -D
 
     while((opt = getopt(argc, argv, optstr.c_str())) != -1) {
         switch(opt) {
-            case 't': {
-                long t = 0;
-                if (!isNumber(optarg, t)) {
-                    std::fprintf(stderr, "Error: wrong '-t' option\n");
-                    usage(argv[0]);
-                    return -1;
-                }
-                if (t < 2l) { // 2l stands for 2 of type long
-                    std::fprintf(stderr, "Threshold too low, setting to minimum (2 MB)\n");
-                    t = 2l; // set the minimum threshold to 2 MB
-                }  
-                BIGFILE_LOW_THRESHOLD = t * (1024 * 1024);
-                start += 2;
-                if (BIGFILE_LOW_THRESHOLD > 100 * 1024 * 1024) { // just to set a limit
-                    std::fprintf(stderr, "Error: \"BIG file\" low threshold too high %ld\n", BIGFILE_LOW_THRESHOLD);
-                    return -1;
-                }
-            } break;
             case 'r': {
                 long n = 0;
                 if (!isNumber(optarg, n)) {
@@ -85,7 +66,7 @@ int parseCommandLine(int argc, char *argv[]) {
             case 'q': {
                 long q = 0;
                 if (!isNumber(optarg, q)) {
-                    std::fprintf(stderr, "Error: wrong '-D' option\n");
+                    std::fprintf(stderr, "Error: wrong '-q' option\n");
                     usage(argv[0]);
                     return -1;
                 }	    	    

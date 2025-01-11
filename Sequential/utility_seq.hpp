@@ -30,7 +30,6 @@ this file was built on top of the utility.hpp file from the ffc folder
 
 // global variables with their default values ---------------------------------------------------
 static bool comp = true;                        // by default, it compresses 
-static size_t BIGFILE_LOW_THRESHOLD = 2097152;  // 2Mbytes threshold 
 static bool REMOVE_ORIGIN = false;              // Does it keep the origin file?
 static int  QUITE_MODE = 1;                     // 0 silent, 1 only errors, 2 everything
 static bool RECUR = false;                      // do we have to process the contents of subdirs?
@@ -240,21 +239,20 @@ static inline int checkHeader(const char fname[]) {
     stream.avail_out = 256;
 
     if (inflateInit(&stream)) {
-	fclose(pInfile); 
-	return -1;
+		fclose(pInfile); 
+		return -1;
     }
     size_t n = 12;  // this is the minimum size of a compressed file
     if (fread(s_inbuf, 1, n, pInfile) != n) {   
-	fclose(pInfile);
-	return -1;
+		fclose(pInfile);
+		return -1;
     }
     stream.next_in    = s_inbuf;
     stream.avail_in   = n;	  
     int status = inflate(&stream, Z_SYNC_FLUSH);
     fclose(pInfile);
     inflateEnd(&stream);
-    if (status == Z_STREAM_END || status == Z_OK)  
-	return 1;  
+    if (status == Z_STREAM_END || status == Z_OK)  return 1;  
     return 0;
 }
     
@@ -387,9 +385,9 @@ static inline int decompressFile(const char fname[], size_t infile_size,
 // returns false in case of error
 static inline bool doWork(const char fname[], size_t size, const bool comp) {
     if (comp) {
-	if (compressFile(fname, size, REMOVE_ORIGIN)<0) return false;
+		if (compressFile(fname, size, REMOVE_ORIGIN) < 0) return false;
     } else {
-	if (decompressFile(fname, size, REMOVE_ORIGIN)<0) return false;
+		if (decompressFile(fname, size, REMOVE_ORIGIN) < 0) return false;
     }
     return true;
 }
@@ -397,57 +395,53 @@ static inline bool doWork(const char fname[], size_t size, const bool comp) {
 // returns false in case of error
 static inline bool walkDir(const char dname[], const bool comp) {
     if (chdir(dname) == -1) {
-	if (QUITE_MODE>=1) {
-	    perror("chdir");
-	    std::fprintf(stderr, "Error: chdir %s\n", dname);
-	}
-	return false;
+		if (QUITE_MODE >= 1) {
+			perror("chdir");
+			std::fprintf(stderr, "Error: chdir %s\n", dname);
+		}
+		return false;
     }
     DIR *dir;	
-    if ((dir=opendir(".")) == NULL) {
-	if (QUITE_MODE>=1) {
-	    perror("opendir");
-	    std::fprintf(stderr, "Error: opendir %s\n", dname);
-	}
-	return false;
+    if ((dir = opendir(".")) == NULL) {
+		if (QUITE_MODE >= 1) {
+			perror("opendir");
+			std::fprintf(stderr, "Error: opendir %s\n", dname);
+		}
+		return false;
     }
     struct dirent *file;
-    bool error=false;
-    while((errno=0, file =readdir(dir)) != NULL) {
-	struct stat statbuf;
-	if (stat(file->d_name, &statbuf)==-1) {
-	    if (QUITE_MODE>=1) {		
-			perror("stat");
-			std::fprintf(stderr, "Error: stat %s\n", file->d_name);
-	    }
-	    return false;
-	}
-	if(S_ISDIR(statbuf.st_mode)) {
-	    if ( !isdot(file->d_name) ) {
-			if (walkDir(file->d_name, comp)) {
-				if (!chdir("..")) {
-					perror("chdir");
-					std::fprintf(stderr, "Error: chdir ..\n");
-					error = true;
-				}
+    bool error = false;
+    while((errno = 0, file = readdir(dir)) != NULL) {
+		struct stat statbuf;
+		if (stat(file->d_name, &statbuf) == -1) {
+			if (QUITE_MODE >= 1) {		
+				perror("stat");
+				std::fprintf(stderr, "Error: stat %s\n", file->d_name);
 			}
-			else error  = true;
-	    }
-	} else {
-	    if (!doWork(file->d_name, statbuf.st_size, comp)) error = true;
-	}
+			return false;
+		}
+		if (S_ISDIR(statbuf.st_mode)) {
+			if ( !isdot(file->d_name) ) { // check if it is '.' or '..'
+				if (RECUR) { // process the content of subdirs if RECUR is true
+					if (walkDir(file->d_name, comp)) {
+						if (!chdir("..")) {
+							perror("chdir");
+							std::fprintf(stderr, "Error: chdir ..\n");
+							error = true;
+						}
+					} else error = true;
+				}	
+			}
+		} else { // it is a file
+			if (!doWork(file->d_name, statbuf.st_size, comp)) error = true;
+		}
     }
     if (errno != 0) {
-	if (QUITE_MODE>=1) perror("readdir");
-	error=true;
+		if (QUITE_MODE >= 1) perror("readdir");
+		error=true;
     }
     closedir(dir);
     return !error;
 }
-
-// --------------------------------------------------------------------------
-/* New functions for the sequential version */
-
-
 
 #endif // _UTILITY_HPP_seq

@@ -1,0 +1,1 @@
+vedere se posso mettere come FF_ROOT qualcosa tipo {HOME}/fastflow
