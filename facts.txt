@@ -10,3 +10,10 @@ To check where you are and what folders you have available do: `ls`.
 
 
 One nice thing to know if you have to compile many (like thousands) C++ files: if you do `make -j` you compile everything in parallel, if you do `make -j n` you compile with n cores. So basically you can compile many programs in parallel.
+
+To search for a specific term within files that match a given pattern in a directory and its subdirectories do:
+find <directory> -name "<filename_pattern>" -exec grep -H "<search_term>" {} \;
+(for example, if you want to find where ffTime appears in the hpp files of the fastflow/ff folder do: find fastflow/ff -name "*.hpp" -exec grep -H "ffTime" {} \;)
+
+In the binary system, a kilobyte is defined as 1024 bytes, not 1000 bytes: 1 KB = 1024 bytes
+Therefore, we have that: 1 MB = 1024 KB = 1024 * 1024 bytes
