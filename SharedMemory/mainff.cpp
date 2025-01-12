@@ -11,21 +11,21 @@ Parallel schema:
                |     |--> R-Worker --|    
 
 
+Files are distinguished between "small files" and "big files" depending on BIGFILE_LOW_THRESHOLD.
 
 
 
-* Parallel schema:
- *
- *  |<----------- FastFlow's farm ---------->| 
- *
- *               |---> Worker --->|
- *               |                |
- *   Reader ---> |---> Worker --->| --> Writer
- *               |                |
- *               |---> Worker --->|
- *
- *  "small files", those whose size is < BIGFILE_LOW_THRESHOLD
- *  "BIG files", all other files
+This file was built on top of the primes_a2a.cpp file from the exercises/spmcode7 folder, and ffc_farm.cpp from the ffc folder.
+
+
+--------------------
+#TODO: scrivere in dettaglio questa parte
+Compression:
+
+Decompression:
+
+
+
  *
  * ------------
  * Compression: 
@@ -60,6 +60,7 @@ Parallel schema:
 */
 
 #include <cstdio>
+#include <iostream>
 
 #include <cmdline_ff.hpp>
 #include <utility_ff.hpp>
@@ -82,16 +83,81 @@ struct L_Worker: ff_monode_t<Task_t> {
 
 
 struct R_Worker: ff_minode_t<Task_t> {
+    R_Worker(const size_t Lw) : Lw(Lw) {}
 
+    Task_t *svc(Task_t *in) {
+        
+    }
+
+    const size_t Lw;
 };
 
 
 struct Writer: ff_minode_t<Task_t> {
+    Writer(const size_t Rw) : Rw(Rw) {}
 
+    Task_t *svc(Task_t *in) {
+        
+    }
+
+    const size_t Rw;
 };
 
 
+// ---------------------------------------------------------- main ----------------------------------------------------------
 int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        usage(argv[0]);
+        return -1;
+    }
+    // parse command line arguments and set some global variables
+    long start = parseCommandLine(argc, argv);
+    if (start < 0) return -1;
+
+    const size_t Lw = lworkers;
+    const size_t Rw = rworkers;
+
+    // Start the timer //TODO: eventualmente mettere chrono come in quello seq
+    ffTime(START_TIME);
+
+    // Define the FastFlow network ----------------------
+    std::vector<ff_node*> LW;
+    std::vector<ff_node*> RW;
+
+    for (size_t i = 0; i < Lw; ++i) {
+        start = stop;
+        stop = start + size + (more > 0 ? 1 : 0);
+        --more;
+        LW.push_back(new L_Worker(start, stop));
+    }
+
+    for (size_t i = 0; i < Rw; ++i) {
+        RW.push_back(new R_Worker(Lw));
+    }
+
+    ff_a2a a2a;
+    a2a.add_firstset(LW);
+    a2a.add_secondset(RW);
+
+    Writer writer(Rw);
+
+    ff_Pipe<> pipe(a2a, writer);
+
+    pipe.blocking_mode(cc); //TODO: vedere se serve
+
+    if (pipe.run_and_wait_end() < 0) {
+        error("running pipe(a2a, writer)\n");
+        return -1;
+    }
+    // --------------------------------------------------
+
+    // Stop the timer
+    ffTime(STOP_TIME);
+
+    // Calculate and display the elapsed time in seconds (ffTime returns the elapsed time in milliseconds)
+    std::cout << "Elapsed time: " << ffTime(GET_TIME) / 1000.0 << "s\n";
+
+    if (QUITE_MODE >= 1) std::cout << "pipe(a2a, writer) Time: " << pipe.ffTime() << " (ms)\n";
 
     return 0;
 }
