@@ -1,5 +1,5 @@
 /*
-Sequential version of a cmpressor/decompressor using Miniz.
+Sequential version of a compressor/decompressor using Miniz.
 
 Miniz source code: https://github.com/richgel999/miniz
 https://code.google.com/archive/p/miniz/
@@ -10,6 +10,7 @@ this file was built on top of the compdecomp.cpp file from the ffc folder
 
 #include <cstdio>
 #include <chrono>
+#include <iostream>
 
 #include <cmdline_seq.hpp>
 #include <utility_seq.hpp>
@@ -58,7 +59,7 @@ int main(int argc, char *argv[]) {
 
     // Calculate and display the elapsed time
     std::chrono::duration<double> elapsed_seconds = end_time - start_time;
-    printf("Elapsed time: %f \n", elapsed_seconds);
+    std::cout << "Elapsed time: " << elapsed_seconds.count() << "s\n";
 
     return 0;
 }

@@ -22,7 +22,7 @@ this file was built on top of the utility.hpp file from the ffc folder
 #include <stdexcept>
 
 
-#include <miniz/miniz.h>
+#include <../miniz/miniz.h>
 
 
 #define SUFFIX ".zip"
@@ -412,6 +412,9 @@ static inline bool walkDir(const char dname[], const bool comp) {
     struct dirent *file;
     bool error = false;
     while((errno = 0, file = readdir(dir)) != NULL) {
+		if (strcmp(file->d_name, ".DS_Store") == 0) {
+			continue; // Skip the .DS_Store file
+		}
 		struct stat statbuf;
 		if (stat(file->d_name, &statbuf) == -1) {
 			if (QUITE_MODE >= 1) {		
@@ -424,7 +427,7 @@ static inline bool walkDir(const char dname[], const bool comp) {
 			if ( !isdot(file->d_name) ) { // check if it is '.' or '..'
 				if (RECUR) { // process the content of subdirs if RECUR is true
 					if (walkDir(file->d_name, comp)) {
-						if (!chdir("..")) {
+						if (chdir("..") == -1) {
 							perror("chdir");
 							std::fprintf(stderr, "Error: chdir ..\n");
 							error = true;

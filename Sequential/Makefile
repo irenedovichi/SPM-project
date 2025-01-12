@@ -9,12 +9,12 @@ TARGETS		= mainseq
 
 
 %: %.cpp
-	$(CXX) $(INCLUDES) $(OPTFLAGS) -o $@ $< ./miniz/miniz.c
+	$(CXX) $(INCLUDES) $(OPTFLAGS) -o $@ $< ../miniz/miniz.c
 
 all		: $(TARGETS)
 
 mainseq	: mainseq.cpp cmdline_seq.hpp utility_seq.hpp
-	$(CXX) $(INCLUDES) $(OPTFLAGS) -o $@ $< ./miniz/miniz.c 
+	$(CXX) $(INCLUDES) $(OPTFLAGS) -o $@ $< ../miniz/miniz.c 
 
 
 clean		: 
