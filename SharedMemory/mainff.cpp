@@ -410,7 +410,7 @@ int main(int argc, char *argv[]) {
     ffTime(START_TIME);
 
     // Distribute the workload among the Lw L-workers
-    std::vector<std::vector<std::string>> partitions = partitionInput(start, argv, argc, Lw);
+    std::vector<std::vector<std::string>> partitions = partitionInput(start, argv, argc, Lw, comp);
 
     // Define the FastFlow network ----------------------
     std::vector<ff_node*> LW;
@@ -432,7 +432,7 @@ int main(int argc, char *argv[]) {
 
     ff_Pipe<> pipe(a2a, writer);
 
-    pipe.blocking_mode(cc); //TODO: vedere se serve
+    pipe.blocking_mode(BLOCKING); //TODO: vedere come cambia mettenedo BLOCKING = false
 
     if (pipe.run_and_wait_end() < 0) {
         error("running pipe(a2a, writer)\n");

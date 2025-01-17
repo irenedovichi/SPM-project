@@ -18,7 +18,6 @@ this file was built on top of the utility.hpp file from the ffc folder
 #include <string>
 #include <stdexcept>
 
-
 #include <../miniz/miniz.h>
 
 

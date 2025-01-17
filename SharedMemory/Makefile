@@ -7,7 +7,7 @@ endif
 
 CXX		    = g++ -std=c++20
 INCLUDES	= -I . -I miniz
-CXXFLAGS  	+= -Wall -DNO_DEFAULT_MAPPING -DBLOCKING_MODE -DFF_BOUNDED_BUFFER -DDEFAULT_BUFFER_CAPACITY=512 //TODO: sistemare
+CXXFLAGS  	+= -Wall -DBLOCKING_MODE #-DFF_BOUNDED_BUFFER -DDEFAULT_BUFFER_CAPACITY=512 
 
 LDFLAGS 	= -pthread
 OPTFLAGS	= -O3 -ffast-math -DNDEBUG
@@ -24,7 +24,7 @@ TARGETS		= mainff
 all		: $(TARGETS)
 
 mainff  : mainff.cpp cmdline_ff.hpp utility_ff.hpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -I$(FF_ROOT) $(OPTFLAGS) -o $@ $< ./miniz/miniz.c $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -I$(FF_ROOT) $(OPTFLAGS) -o $@ $< ../miniz/miniz.c $(LDFLAGS)
 
 
 clean		: 

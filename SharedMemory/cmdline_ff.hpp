@@ -15,7 +15,7 @@ this file was built on top of the cmdline.hpp file from the ffc folder
 // Set some global variables, a few others are in utility_ff.hpp 
 static long lworkers = 2;  // the number of Left Workers
 static long rworkers = ff_numCores() - 3;  // the number of Right Workers
-static bool cc = false;    // concurrency control, default is blocking
+static bool BLOCKING = true;    // concurrency control, default is blocking
 
 
 static inline void usage(const char *argv0) {
@@ -29,7 +29,7 @@ static inline void usage(const char *argv0) {
     std::printf(" -C compress: 0 preserves, 1 removes the original file (default C=%d)\n", REMOVE_ORIGIN ? 1 : 0);
     std::printf(" -D decompress: 0 preserves, 1 removes the original file (default D=%d)\n", REMOVE_ORIGIN ? 1 : 0);
     std::printf(" -q 0 silent mode, 1 prints only error messages to stderr, 2 verbose (default q=%d)\n", QUITE_MODE ? 1 : 0);
-    std::printf(" -b 0 blocking, 1 non-blocking concurrency control (default b=%d)\n", cc ? 1 : 0);
+    std::printf(" -b 1 blocking, 0 non-blocking concurrency control (default b=%d)\n", BLOCKING ? 1 : 0);
     std::printf("--------------------\n");
 }
 
@@ -51,7 +51,7 @@ int parseCommandLine(int argc, char *argv[]) {
                 }
                 // if l is negative or zero, it will be set to default value
                 if (l <= 0) {
-                    std::fprintf(stderr, "Warning: the number of Left Workers must be positive, set to default value %d\n", lworkers);
+                    std::fprintf(stderr, "Warning: the number of Left Workers must be positive, set to default value %ld\n", lworkers);
                     l = lworkers;
                 }
                 lworkers = l;
@@ -66,7 +66,7 @@ int parseCommandLine(int argc, char *argv[]) {
                 }
                 // if r is negative or zero, it will be set to default value
                 if (r <= 0) {
-                    std::fprintf(stderr, "Warning: the number of Right Workers must be positive, set to default value %d\n", rworkers);
+                    std::fprintf(stderr, "Warning: the number of Right Workers must be positive, set to default value %ld\n", rworkers);
                     r = rworkers;
                 }
                 rworkers = r;
@@ -137,7 +137,7 @@ int parseCommandLine(int argc, char *argv[]) {
                     usage(argv[0]);
                     return -1;
                 }
-                if (b == 1) cc = true;
+                if (b == 0) BLOCKING = false;
                 start += 2;
             } break;
             default:
