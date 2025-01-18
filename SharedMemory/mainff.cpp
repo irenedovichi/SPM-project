@@ -22,7 +22,7 @@ Note: This file was built on top of the primes_a2a.cpp file from the exercises/s
 
 #include <cstdio>
 #include <iostream>
-# include <string>
+#include <string>
 
 #include <cmdline_ff.hpp>
 
@@ -532,7 +532,7 @@ int main(int argc, char *argv[]) {
     ffTime(STOP_TIME);
 
     // Calculate and display the elapsed time in seconds (ffTime returns the elapsed time in milliseconds)
-    std::cout << "Elapsed time: " << ffTime(GET_TIME) / 1000.0 << "s\n";
+    std::cout << "Elapsed time: " << ffTime(GET_TIME) / 1000.0 << " s\n";
 
     if (QUITE_MODE >= 1) std::cout << "pipe(a2a, writer) Time: " << pipe.ffTime() << " (ms)\n";
 

@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
 
     // Calculate and display the elapsed time
     std::chrono::duration<double> elapsed_seconds = end_time - start_time;
-    std::cout << "Elapsed time: " << elapsed_seconds.count() << "s\n";
+    std::cout << "Elapsed time: " << elapsed_seconds.count() << " s\n";
 
     return 0;
 }
