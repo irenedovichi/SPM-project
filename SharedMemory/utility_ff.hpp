@@ -116,14 +116,14 @@ static inline void unmapFile(unsigned char *ptr, size_t size) {
 Added by me 
 ------------------------------------------------------------------------------------------------------------------------------------------------*/
 
-// Function to get files in a directory (recursively or not, depending on RECUR flag)
-std::vector<std::string> getFilesInDir(const std::string &dirPath, bool RECUR) {
-    std::vector<std::string> files;
+// Function to get files in a directory sorted by size (recursively or not, depending on RECUR flag)
+std::vector<std::pair<std::string, long>> getSortedFilesInDir(const std::string &dirPath, bool RECUR) {
+    std::vector<std::pair<std::string, long>> filesWithSizes;
     DIR *dir = opendir(dirPath.c_str());
 
     if (!dir) {
         std::cerr << "Error opening directory: " << dirPath << std::endl;
-        return files; // Return an empty list on failure
+        return filesWithSizes; // Return an empty list on failure
     }
 
     struct dirent *entry;
@@ -136,6 +136,11 @@ std::vector<std::string> getFilesInDir(const std::string &dirPath, bool RECUR) {
             continue;
         }
 
+        // Skip ".DS_Store" files
+        if (fileName == ".DS_Store") {
+            continue;
+        }
+
         struct stat statbuf;
         if (stat(fullPath.c_str(), &statbuf) == -1) {
             continue; // Skip if stat fails
@@ -144,25 +149,37 @@ std::vector<std::string> getFilesInDir(const std::string &dirPath, bool RECUR) {
         if (S_ISDIR(statbuf.st_mode)) {
             // If it's a directory and RECUR is true, recurse into the directory
             if (RECUR) {
-                std::vector<std::string> subdirFiles = getFilesInDir(fullPath, RECUR);
-                files.insert(files.end(), subdirFiles.begin(), subdirFiles.end());
+                std::vector<std::pair<std::string, long>> subdirFiles = getSortedFilesInDir(fullPath, RECUR);
+                filesWithSizes.insert(filesWithSizes.end(), subdirFiles.begin(), subdirFiles.end());
             }
         } else {
-            // It's a file, add it to the list
-            files.push_back(fullPath);
+            // It's a file, add it to the list with its size
+            filesWithSizes.emplace_back(fullPath, statbuf.st_size);
         }
     }
 
     closedir(dir); // Close the directory after processing
-    return files;
+
+    // Sort the files by size: DESCENDING order (largest files first)
+    std::sort(filesWithSizes.begin(), filesWithSizes.end(), [](const std::pair<std::string, long> &a, const std::pair<std::string, long> &b) {
+        return a.second > b.second;
+    });
+
+    return filesWithSizes;
 }
 
 
 // Function to process a file without reading it (check suffix, size, and assign to a partition)
 void processFile(const std::string &filePath, std::vector<std::vector<std::string>> &partitions, std::vector<long> &partitionSizes) {
     struct stat statbuf; // retrieves metadata about a file, including its size, without reading the file's content
+
     if (stat(filePath.c_str(), &statbuf) == -1) {
         return; // Skip if stat fails
+    }
+
+    //print the stat 
+    if (QUITE_MODE >= 2) {
+        std::fprintf(stderr, "statbuf.st_size of file %s is %lld\n", filePath.c_str(), statbuf.st_size);
     }
 
     // Check file size is non-zero
@@ -207,23 +224,32 @@ static std::vector<std::vector<std::string>> partitionInput(long start, char *ar
 	// number of files in each partition
 	std::vector<long> partitionSizes(n, 0);
 
-	for(long i = start; i < argc - start; ++i) {		
+	for(long i = start; i < argc; ++i) {		
 		struct stat statbuf; // retrieves metadata about a file, including its size, without reading the file's content
+
+        if (stat(argv[i], &statbuf) == -1) {
+            std::perror("stat failed");
+            continue; 
+        }
 
 		// Check if it is a directory
 		if (S_ISDIR(statbuf.st_mode)) {
+            if (QUITE_MODE >= 2) {
+                std::fprintf(stderr, "%s is a directory\n", argv[i]);
+            }
+
 			// Get all the files in the dir (depending on RECUR, get also the files in the subdirs)
-			std::vector<std::string> files = getFilesInDir(argv[i], RECUR);
+			std::vector<std::pair<std::string, long>> files = getSortedFilesInDir(argv[i], RECUR);
 
 			// Process these files
-            for (const std::string &file : files) {
+            for (const auto &[file, size] : files) {
                 processFile(file, partitions, partitionSizes); 
             }
 
             continue;
-		} 
-		// argv[i] is a file
-		processFile(argv[i], partitions, partitionSizes);
+		} else { // argv[i] is a file
+		    processFile(argv[i], partitions, partitionSizes);
+        }
 		}
 
 	return partitions;

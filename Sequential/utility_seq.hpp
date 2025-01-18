@@ -3,6 +3,8 @@
 
 /*
 this file was built on top of the utility.hpp file from the ffc folder
+
+Note: I modified the function compressFile in order to not compress files that already have SUFFIX as a suffix.
 */
 
 #include <sys/mman.h>
@@ -197,9 +199,19 @@ static inline bool removeDir(const std::string &tmpdir, bool force=false) {
 // if removeOrigin is true, the source file will be removed if successfully compressed
 static inline int compressFile(const char fname[], size_t infile_size,
 			       const bool removeOrigin=REMOVE_ORIGIN) {
-    // define the output file name 
+    // input file name
     const std::string infilename(fname);
-    std::string outfilename = std::string(fname) + ".zip";
+
+	// Check if the file already has a .zip suffix
+    if (infilename.size() > 4 && infilename.substr(infilename.size() - 4) == SUFFIX) {
+        if (QUITE_MODE >= 1) {
+            std::fprintf(stderr, "File %s already has a .zip suffix -- skipping compression\n", fname);
+        }
+        return 0; // Indicate success without compression
+    }
+
+	// define the output file name
+    std::string outfilename = std::string(fname) + SUFFIX;
 
     unsigned char *ptr = nullptr;
     if (!mapFile(fname, infile_size, ptr)) return -1;

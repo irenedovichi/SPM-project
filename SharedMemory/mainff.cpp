@@ -25,7 +25,6 @@ Note: This file was built on top of the primes_a2a.cpp file from the exercises/s
 # include <string>
 
 #include <cmdline_ff.hpp>
-#include <utility_ff.hpp>
 
 #include <ff/ff.hpp>
 #include <ff/pipeline.hpp>
@@ -56,10 +55,23 @@ struct L_Worker: ff_monode_t<Task_t> {
     bool doWorkCompress(const std::string& fname, size_t size) {
         unsigned char *ptr = nullptr;
 
+        if (QUITE_MODE >= 2) {
+            std::fprintf(stderr, "L-Worker: %lu is compressing\n", get_my_id());
+        }
+
 		if (!mapFile(fname.c_str(), size, ptr)) return false;
+
+        if (QUITE_MODE >= 2) {
+            std::fprintf(stderr, "L-Worker: %lu has mapped the file\n", get_my_id());
+        }
 
 		if (size <= BIGFILE_LOW_THRESHOLD) {
 			Task_t *t = new Task_t(ptr, size, fname);
+
+            if (QUITE_MODE >= 2) {
+                std::fprintf(stderr, "L-Worker: %lu is sending to the next stage the file %s\n", get_my_id(), fname.c_str());
+            }
+
 			ff_send_out(t); // sending to the next stage
 		} else {
 			const size_t fullblocks   = size / BIGFILE_LOW_THRESHOLD;
@@ -68,12 +80,22 @@ struct L_Worker: ff_monode_t<Task_t> {
 				Task_t *t = new Task_t(ptr + (i * BIGFILE_LOW_THRESHOLD), BIGFILE_LOW_THRESHOLD, fname);
 				t->blockid = i + 1;
 				t->nblocks = fullblocks + (partialblock > 0);
+
+                if (QUITE_MODE >= 2) {
+                    std::fprintf(stderr, "L-Worker: %lu is sending to the next stage part %zd of the file %s\n", get_my_id(), t->blockid, fname.c_str());
+                } 
+
 				ff_send_out(t); // sending to the next stage
 			}
 			if (partialblock) {
 				Task_t *t = new Task_t(ptr + (fullblocks * BIGFILE_LOW_THRESHOLD), partialblock, fname);
 				t->blockid = fullblocks + 1;
 				t->nblocks = fullblocks + 1;
+
+                if (QUITE_MODE >= 2) {
+                    std::fprintf(stderr, "L-Worker: %lu is sending to the next stage part %zd of the file %s that has size %ld\n", get_my_id(), t->blockid, fname.c_str(), partialblock);
+                }
+
 				ff_send_out(t); // sending to the next stage
 			}
 		}
@@ -89,6 +111,10 @@ struct L_Worker: ff_monode_t<Task_t> {
         // Read the first 8 bytes to determine if it was a small or big file
         size_t nblocks = *reinterpret_cast<size_t *>(ptr);
 
+        if (QUITE_MODE >= 2) {
+            std::fprintf(stderr, "Num of blocks: %zu\n", nblocks);
+        }
+
         // Initialize a pointer that scrolls the header until it reaches the actual file contents (8 bytes have already been read: nblocks)
         unsigned char *dataPtr = ptr + sizeof(size_t);  // Move past the 8 bytes of nblocks
 
@@ -101,6 +127,10 @@ struct L_Worker: ff_monode_t<Task_t> {
             Sizes[i] = sizeBlock; 
             cmpSizes[i] = cmp_sizeBlock; 
             dataPtr += 2 * sizeof(size_t); // Move to the next block's size information
+
+            if (QUITE_MODE >= 2) {
+                std::fprintf(stderr, "Original size of block %zu: %zu, compressed size: %zu\n", i, sizeBlock, cmp_sizeBlock);
+            }
         }
 
         // At this point, dataPtr points to the actual file contents (compressed data)
@@ -128,8 +158,19 @@ struct L_Worker: ff_monode_t<Task_t> {
         // compress or decompress each file assigned to this worker
         for (const auto &file : files) {
             struct stat statbuf;
+
+            //TODO: check if with many L-workers the stat is done multiple times
+            if (stat(file.c_str(), &statbuf) == -1) {
+                std::perror("stat failed");
+                continue; 
+            }
+
             if (comp) {
                 // compress the file
+                if (QUITE_MODE >= 2) {
+                    std::fprintf(stderr, "L-Worker: %lu is compressing file %s of size %lld\n", get_my_id(), file.c_str(), statbuf.st_size);
+                }
+
                 if (!doWorkCompress(file, statbuf.st_size)) {
                     std::cerr << "Error compressing file: " << file << std::endl;
                     return EOS;
@@ -164,6 +205,10 @@ struct R_Worker: ff_minode_t<Task_t> {
 			// get an estimation of the maximum compression size
 			unsigned long cmp_len = compressBound(inSize);
 
+            if (QUITE_MODE >= 2) {
+                std::fprintf(stderr, "R-Worker %lu is compressing file %s, block %zd of size %zu. Bound of: %zu\n", get_my_id(), in->filename.c_str(), in->blockid, in->size, cmp_len);
+            }
+
 			// allocate memory to store compressed data in memory
 			unsigned char *ptrOut = new unsigned char[cmp_len];
 			if (compress(ptrOut, &cmp_len, (const unsigned char *)inPtr, inSize) != Z_OK) {
@@ -177,46 +222,53 @@ struct R_Worker: ff_minode_t<Task_t> {
 			in->ptrOut   = ptrOut;
 			in->cmp_size = cmp_len;  // now it's the real compression size (see compress in miniz for details)
 
+            if (QUITE_MODE >= 2) {
+                std::fprintf(stderr, "R-Worker %lu has compressed file %s of size %zu of block %zd. True size of: %zu\n", get_my_id(), in->filename.c_str(), in->size, in->blockid, cmp_len);
+            }
+
             if (!oneblockfile) {
                 // Directly pass the task to the Writer
                 ff_send_out(in);
                 return GO_ON;
-            } 
-            // Single block file case: write the compressed data to a file with header 
-            std::string outfile{in->filename + SUFFIX};
-            FILE *out_fp = std::fopen(outfile.c_str(), "wb");
-            if (!out_fp) {
-                if (QUITE_MODE >= 1) 
-                    std::fprintf(stderr, "Error opening file %s\n", outfile.c_str());
-                success = false;
+            } else { // Single block file case: write the compressed data to a file with header 
+                std::string outfile{in->filename + SUFFIX};
+                FILE *out_fp = std::fopen(outfile.c_str(), "wb");
+                if (!out_fp) {
+                    if (QUITE_MODE >= 1) 
+                        std::fprintf(stderr, "Error opening file %s\n", outfile.c_str());
+                    success = false;
+                    delete [] in->ptrOut;
+                    delete in;
+                    return GO_ON;
+                }
+                
+                // Write the header for the single block file: 1, size, cmp_size (24 bytes)
+                std::fwrite(&in->nblocks, sizeof(in->nblocks), 1, out_fp);
+                std::fwrite(&in->size, sizeof(in->size), 1, out_fp);
+                std::fwrite(&in->cmp_size, sizeof(in->cmp_size), 1, out_fp);
+                
+                // Write the compressed data
+                if (std::fwrite(in->ptrOut, 1, in->cmp_size, out_fp) != in->cmp_size) {
+                    if (QUITE_MODE >= 1) 
+                        std::fprintf(stderr, "Error writing compressed data to file %s\n", outfile.c_str());
+                    success = false;
+                }
+
+                //TODO: togliere
+                //std::fprintf(stderr, "DEBUG");
+                
+                std::fclose(out_fp);
+                
+                if (REMOVE_ORIGIN) {
+                    unlink(in->filename.c_str());
+                }
+                
+                // Clean up and return
+                unmapFile(in->ptr, in->size);	
                 delete [] in->ptrOut;
                 delete in;
                 return GO_ON;
             }
-            
-            // Write the header for the single block file: 1, size, cmp_size (24 bytes)
-            std::fwrite(&in->nblocks, sizeof(in->nblocks), 1, out_fp);
-            std::fwrite(&in->size, sizeof(in->size), 1, out_fp);
-            std::fwrite(&in->cmp_size, sizeof(in->cmp_size), 1, out_fp);
-            
-            // Write the compressed data
-            if (std::fwrite(in->ptrOut, 1, in->cmp_size, out_fp) != in->cmp_size) {
-                if (QUITE_MODE >= 1) 
-                    std::fprintf(stderr, "Error writing compressed data to file %s\n", outfile.c_str());
-                success = false;
-            }
-            
-            std::fclose(out_fp);
-            
-            if (REMOVE_ORIGIN) {
-                unlink(in->filename.c_str());
-            }
-            
-            // Clean up and return
-            unmapFile(in->ptr, in->size);	
-            delete [] in->ptrOut;
-            delete in;
-            return GO_ON;
 		} else {
             // Decompression part
 
@@ -241,6 +293,7 @@ struct R_Worker: ff_minode_t<Task_t> {
                 delete [] temp_input_buffer;
                 in->ptrOut = buffer;
                 ff_send_out(in);
+                return GO_ON;
             }
             // Single block file case: decompress the data pointed by in->ptr and write it to a file
             if (uncompress(buffer, &buffer_size, in->ptr, in->size) != Z_OK) {
@@ -275,7 +328,6 @@ struct R_Worker: ff_minode_t<Task_t> {
                 unlink(in->filename.c_str());
             }
             // Clean up and return
-            unmapFile(in->ptr, in->size);
             delete [] buffer;
             delete in;
             return GO_ON;
@@ -299,6 +351,10 @@ struct Writer: ff_minode_t<Task_t> {
     Writer(const size_t Rw) : Rw(Rw) {}
 
     Task_t *svc(Task_t *in) {
+        if (QUITE_MODE >= 2) {
+            std::fprintf(stderr, "Welcome, I am the Writer and I received the block %zu of file %s\n", in->blockid, in->filename.c_str());
+        }
+
         // Insert the current task into the map
         auto& fileEntry = fileMap[in->filename];
         fileEntry.first = in->nblocks;
@@ -306,11 +362,23 @@ struct Writer: ff_minode_t<Task_t> {
 
         // Check if all blocks for the file are collected
         if (fileEntry.second.size() == fileEntry.first) {
+
+            if (QUITE_MODE >= 2) {
+                std::fprintf(stderr, "Writer: I have received all the blocks for file %s (last block was: %zu)\n", in->filename.c_str(), in->blockid);
+            }
+
             // Sort blocks by block ID
             auto& blocks = fileEntry.second;
             std::sort(blocks.begin(), blocks.end(), [](Task_t* a, Task_t* b) {
                 return a->blockid < b->blockid;
             });
+
+            if (QUITE_MODE >= 2) {
+                std::fprintf(stderr, "Writer: I have sorted the blocks for file %s\n", in->filename.c_str());
+                for (auto& task : blocks) {
+                    std::fprintf(stderr, "Block %zu\n", task->blockid);
+                }
+            }
 
             // Compression: write the compressed data to a file (adding the suffix) with the header
             if (comp) {
@@ -325,24 +393,29 @@ struct Writer: ff_minode_t<Task_t> {
                 // Write first element of the header: nblocks
                 std::fwrite(&blocks[0]->nblocks, sizeof(size_t), 1, out_fp);
 
+                if (QUITE_MODE >= 2) {
+                    std::fprintf(stderr, "Number of blocks is %zu\n", blocks[0]->nblocks);
+                }
+
                 // Write each block's size and compressed size
                 for (auto& task : blocks) {
                     std::fwrite(&task->size, sizeof(size_t), 1, out_fp);
                     std::fwrite(&task->cmp_size, sizeof(size_t), 1, out_fp);
                 }
 
+                if (QUITE_MODE >= 2) {
+                    for (auto& task : blocks) {
+                        std::fprintf(stderr, "Original size %zu, cmp_size %zu\n", task->size, task->cmp_size);
+                    }
+                }
+
                 // Write compressed data
                 for (auto& task : blocks) {
                     std::fwrite(task->ptrOut, 1, task->cmp_size, out_fp);
-                    delete[] task->ptrOut;
                 }
 
                 std::fclose(out_fp);
 
-                // Remove original file if flag is set
-                if (REMOVE_ORIGIN) {
-                    unlink(blocks[0]->filename.c_str());
-                }
             } else { // Decompression: write the decompressed data to a file (removing the suffix)
                 std::string outfile = blocks[0]->filename.substr(0, blocks[0]->filename.size() - strlen(SUFFIX));
                 FILE* out_fp = std::fopen(outfile.c_str(), "wb");
@@ -359,18 +432,26 @@ struct Writer: ff_minode_t<Task_t> {
 
                 std::fclose(out_fp);
 
-                // Remove original file if flag is set
-                if (REMOVE_ORIGIN) {
-                    unlink(blocks[0]->filename.c_str());
-                }
+            }
+
+            // Remove original file if flag is set
+            if (REMOVE_ORIGIN) {
+                unlink(blocks[0]->filename.c_str());
             }
 
             // Clean up
+            /*
             for (auto& task : blocks) {
                 unmapFile(task->ptr, task->size);
                 delete task;
             }
+            */
+
             fileMap.erase(in->filename);
+        }
+
+        if (QUITE_MODE >= 2) {
+            std::fprintf(stderr, "Goodbye, I am the Writer and I have written the block %zu of file %s\n", in->blockid, in->filename.c_str());
         }
 
         return GO_ON;
@@ -388,7 +469,8 @@ struct Writer: ff_minode_t<Task_t> {
     }
 
     // Key: filename, value: pair <nblocks, vector of blocks>
-    static std::unordered_map<std::string, std::pair<size_t, std::vector<Task_t*>>> fileMap;
+    std::unordered_map<std::string, std::pair<size_t, std::vector<Task_t*>>> fileMap;
+
     const size_t Rw;
 };
 
@@ -410,7 +492,17 @@ int main(int argc, char *argv[]) {
     ffTime(START_TIME);
 
     // Distribute the workload among the Lw L-workers
-    std::vector<std::vector<std::string>> partitions = partitionInput(start, argv, argc, Lw, comp);
+    std::vector<std::vector<std::string>> partitions = partitionInput(start, argv, argc, Lw);
+
+    // If quiet >=2 print the partitions
+    if (QUITE_MODE >= 2) {
+        for (size_t i = 0; i < partitions.size(); ++i) {
+            std::cout << "Partition " << i << ":\n";
+            for (const auto& file : partitions[i]) {
+                std::cout << file << std::endl;
+            }
+        }
+    }
 
     // Define the FastFlow network ----------------------
     std::vector<ff_node*> LW;

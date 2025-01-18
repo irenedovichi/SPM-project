@@ -79,7 +79,7 @@ int parseCommandLine(int argc, char *argv[]) {
                     usage(argv[0]);
                     return -1;
                 }
-                t = std::min(2l, t); // min threshold accepted is 2MB (2l = 2 long)
+                t = std::max(2l, t); // min threshold accepted is 2MB (2l = 2 long)
                 BIGFILE_LOW_THRESHOLD = t * (1024 * 1024); // convert to bytes
                 if (t > 100) { // just to set a limit
                     std::fprintf(stderr, "Error: \"BIG file\" low threshold too high, set it lower than 100 MB\n"); 
