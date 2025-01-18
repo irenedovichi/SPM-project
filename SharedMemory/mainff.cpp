@@ -159,7 +159,6 @@ struct L_Worker: ff_monode_t<Task_t> {
         for (const auto &file : files) {
             struct stat statbuf;
 
-            //TODO: check if with many L-workers the stat is done multiple times
             if (stat(file.c_str(), &statbuf) == -1) {
                 std::perror("stat failed");
                 continue; 
@@ -253,9 +252,6 @@ struct R_Worker: ff_minode_t<Task_t> {
                         std::fprintf(stderr, "Error writing compressed data to file %s\n", outfile.c_str());
                     success = false;
                 }
-
-                //TODO: togliere
-                //std::fprintf(stderr, "DEBUG");
                 
                 std::fclose(out_fp);
                 
@@ -488,14 +484,14 @@ int main(int argc, char *argv[]) {
     const size_t Lw = lworkers;
     const size_t Rw = rworkers;
 
-    // Start the timer //TODO: eventualmente mettere chrono come in quello seq
+    // Start the timer (identical to chrono misurations)
     ffTime(START_TIME);
 
     // Distribute the workload among the Lw L-workers
     std::vector<std::vector<std::string>> partitions = partitionInput(start, argv, argc, Lw);
 
     // If quiet >=2 print the partitions
-    if (QUITE_MODE >= 2) {
+    if (QUITE_MODE >= 1) {
         for (size_t i = 0; i < partitions.size(); ++i) {
             std::cout << "Partition " << i << ":\n";
             for (const auto& file : partitions[i]) {
@@ -524,7 +520,7 @@ int main(int argc, char *argv[]) {
 
     ff_Pipe<> pipe(a2a, writer);
 
-    pipe.blocking_mode(BLOCKING); //TODO: vedere come cambia mettenedo BLOCKING = false
+    pipe.blocking_mode(BLOCKING); 
 
     if (pipe.run_and_wait_end() < 0) {
         error("running pipe(a2a, writer)\n");
