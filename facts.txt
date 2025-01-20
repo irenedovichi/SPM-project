@@ -17,3 +17,6 @@ find <directory> -name "<filename_pattern>" -exec grep -H "<search_term>" {} \;
 
 In the binary system, a kilobyte is defined as 1024 bytes, not 1000 bytes: 1 KB = 1024 bytes
 Therefore, we have that: 1 MB = 1024 KB = 1024 * 1024 bytes
+
+When running the `mainmpi` file use: mpirun -n 2 ./mainmpi ... 
+(instead of: ./mainmpi ...)

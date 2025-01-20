@@ -46,6 +46,20 @@ static bool isNumber(const char* s, long &n) {
     }
 }
 
+// If compdecomp is true (we are compressing), it checks if fname has the suffix SUFFIX,
+// if yes it returns true
+// If compdecomp is false (we are decompressing), it checks if fname has the suffix SUFFIX,
+// if yes it returns false
+static inline bool discardIt(const char *fname, const bool compdecomp) {
+    const int lensuffix=strlen(SUFFIX);
+    const int len      = strlen(fname);
+    if (len>lensuffix &&
+		(strncmp(&fname[len-lensuffix], SUFFIX, lensuffix)==0)) {
+		return compdecomp; // true or false depends on we are compressing or decompressing;
+    }
+    return !compdecomp;
+}
+
 /*------------------------------------------------------------------------------------------------------------------------------------------------
 Added by me 
 ------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -87,8 +101,10 @@ std::vector<std::string> getFilesInDir(const std::string &dirPath, bool RECUR) {
                 files.insert(files.end(), subdirFiles.begin(), subdirFiles.end());
             }
         } else {
-            // It's a file, add it to the list with its size
-            files.emplace_back(fullPath);
+            // It's a file, add it to the list, if it's not empty
+            if (statbuf.st_size != 0) {
+                files.push_back(fullPath);
+            }
         }
     }
     closedir(dir); // Close the directory after processing
@@ -124,6 +140,13 @@ static std::vector<std::string> getFiles(long start, char *argv[], int argc) {
 
             continue;
 		} else { // argv[i] is a file, add it to the inputFiles vector
+            // check if the file has size 0, if so, skip it
+            if (statbuf.st_size == 0) {
+                if (QUITE_MODE >= 2) {
+                    std::fprintf(stderr, "%s has size 0 -- ignored\n", argv[i]);
+                }
+                continue;
+            }
 			inputFiles.push_back(argv[i]);	
         }
 	}
