@@ -13,6 +13,9 @@ this file was built on top of the utility.hpp file from the ffc folder
 #include <dirent.h> 
 #include <sys/stat.h>
 #include <ftw.h>
+#include <vector>
+#include <iostream>
+#include <fstream>
 
 #include <algorithm>
 #include <string>
