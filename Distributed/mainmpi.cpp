@@ -74,25 +74,14 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Broadcast the global variables //TODO: vedere se serve mandare queste variabili
+    // Broadcast the global variables 
     MPI_Bcast(&comp, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
     MPI_Bcast(&BIGFILE_LOW_THRESHOLD, 1, MPI_LONG, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&RECUR, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&REMOVE_ORIGIN, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
     MPI_Bcast(&QUITE_MODE, 1, MPI_INT, 0, MPI_COMM_WORLD);
     
     //TODO: put a barrier before the timer starts????? --> MPI_Barrier(MPI_COMM_WORLD);
     // Start the timer
     double start_time = MPI_Wtime();
-
-    /*TODO: the master creates the blocks, it will have 2 vectors: one of MetaBlock and one of actual data
-    - Comp case: takes the files and splits them into blocks depending on BIGFILE_LOW_THRESHOLD, fill the MetaBlock struct
-    - Decomp case: takes the files, read the header and split the files into blocks, fill the MetaBlock struct
-
-    Communication: the master takes component i of metaBlocks AND component i of dataBlocks and sends them to a process
-    use MPI_Send and MPI_Recv //TODO: valutare se vanno bene questi o serve il non bloccante
-    il receiver usa MPI_Probe per sapere la size del messaggio
-    */
 
     if (!myId) {
         // The master creates the blocks of data and their metadata ------------------------------------------------------------------------
@@ -293,6 +282,13 @@ int main(int argc, char *argv[]) {
             // Send the data
             MPI_Send(dataBlocks[i].data(), dataBlocks[i].size(), MPI_CHAR, worker, 0, MPI_COMM_WORLD);
         }
+
+        // Send termination message to all workers
+        for (int dest = 1; dest <= numWorkers; ++dest) {
+            MetaBlock terminationMeta;
+            terminationMeta.size = -1; // Use -1 to indicate no more work
+            MPI_Send(&terminationMeta, 1, MPI_MetaBlock, dest, 0, MPI_COMM_WORLD);
+        }
     }
 
     if (myId) {
@@ -302,17 +298,13 @@ int main(int argc, char *argv[]) {
             MPI_Status status;
             MPI_Probe(0, MPI_ANY_TAG, MPI_COMM_WORLD, &status); // Probe for a message from rank 0
 
-            // Get the size of the incoming MetaBlock
-            int metaBlockSize;
-            MPI_Get_count(&status, MPI_BYTE, &metaBlockSize);
-
-            // If no data is received terminate the loop
-            if (metaBlockSize == 0) break;
-
             // Allocate memory for the MetaBlock
             MetaBlock receivedMetaBlock;
             // Receive the MetaBlock
             MPI_Recv(&receivedMetaBlock, 1, MPI_MetaBlock, 0, 0, MPI_COMM_WORLD, &status);
+
+            // Check if the termination message was received
+            if (receivedMetaBlock.size == -1) break;
 
             // Now that we have the metadata, we can proceed to receive the data
             std::vector<char> receivedData(receivedMetaBlock.size);
@@ -322,6 +314,13 @@ int main(int argc, char *argv[]) {
             if (QUITE_MODE >= 2) {
                 std::fprintf(stderr, "Worker %d received metadata block: size %zu, filename %s, cmp_size %zu, blockid %zu, nblocks %zu\n", myId, receivedMetaBlock.size, receivedMetaBlock.filename, receivedMetaBlock.cmp_size, receivedMetaBlock.blockid, receivedMetaBlock.nblocks);
                 std::fprintf(stderr, "Worker %d received data block: size %zu\n", myId, receivedData.size());
+            }
+
+            // Process the data block
+            if (comp) { //TODO: do this
+
+            } else {
+
             }
         }
     }
