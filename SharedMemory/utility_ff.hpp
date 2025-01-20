@@ -250,7 +250,7 @@ static std::vector<std::vector<std::string>> partitionInput(long start, char *ar
 		} else { // argv[i] is a file
 		    processFile(argv[i], partitions, partitionSizes);
         }
-		}
+	}
 
 	return partitions;
 }

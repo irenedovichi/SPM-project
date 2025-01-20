@@ -490,7 +490,7 @@ int main(int argc, char *argv[]) {
     // Distribute the workload among the Lw L-workers
     std::vector<std::vector<std::string>> partitions = partitionInput(start, argv, argc, Lw);
 
-    // If quiet >=2 print the partitions
+    // If quiet >= 1 print the partitions
     if (QUITE_MODE >= 1) {
         for (size_t i = 0; i < partitions.size(); ++i) {
             std::cout << "Partition " << i << ":\n";
