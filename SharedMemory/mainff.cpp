@@ -435,14 +435,6 @@ struct Writer: ff_minode_t<Task_t> {
                 unlink(blocks[0]->filename.c_str());
             }
 
-            // Clean up
-            /*
-            for (auto& task : blocks) {
-                unmapFile(task->ptr, task->size);
-                delete task;
-            }
-            */
-
             fileMap.erase(in->filename);
         }
 

@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <map>
 
 #include <mpi.h>
 
@@ -289,9 +290,81 @@ int main(int argc, char *argv[]) {
             terminationMeta.size = -1; // Use -1 to indicate no more work
             MPI_Send(&terminationMeta, 1, MPI_MetaBlock, dest, 0, MPI_COMM_WORLD);
         }
-    }
 
-    if (myId) {
+        // The master gets the metadata and the data back from the workers ----------------------------------------------------------------
+        std::map<std::string, std::vector<std::pair<MetaBlock, std::vector<char>>>> filesMap;
+
+        // Receive all metadata and data from workers
+        for (size_t i = 0; i < metaBlocks.size(); ++i) {
+            // Receive the metadata
+            MetaBlock receivedMetaBlock;
+            MPI_Status status;
+            MPI_Recv(&receivedMetaBlock, 1, MPI_MetaBlock, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+
+            // Receive the data
+            std::vector<char> receivedData(receivedMetaBlock.cmp_size);
+            MPI_Recv(receivedData.data(), receivedData.size(), MPI_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD, &status);
+
+            // Add the metadata and the data to the map
+            filesMap[receivedMetaBlock.filename].push_back({receivedMetaBlock, receivedData});
+
+            if (QUITE_MODE >= 2) {
+                std::fprintf(stderr, "Master received metadata block: size %zu, filename %s, cmp_size %zu, blockid %zu, nblocks %zu\n", receivedMetaBlock.size, receivedMetaBlock.filename, receivedMetaBlock.cmp_size, receivedMetaBlock.blockid, receivedMetaBlock.nblocks);
+                std::fprintf(stderr, "Master received data block: size %zu\n", receivedData.size());
+            }
+        }
+
+        // Save the processed data to files ------------------------------------------------------------------------------------------------
+        for (auto& [filename, pairs] : filesMap) {
+
+            if (QUITE_MODE >= 2) {
+                std::fprintf(stderr, "Master has %lu pairs of (MetaBlock, data) for file %s\n", pairs.size(), filename.c_str());
+            }
+
+            // Sort the pairs by blockid
+            std::sort(pairs.begin(), pairs.end(), [](const std::pair<MetaBlock, std::vector<char>>& a, const std::pair<MetaBlock, std::vector<char>>& b) {
+                return a.first.blockid < b.first.blockid;
+            });
+
+            // Determine the output filename
+            std::string outputFilename;
+            if (comp) {
+                outputFilename = filename + SUFFIX;
+            } else {
+                outputFilename = filename.substr(0, filename.size() - strlen(SUFFIX));
+            }
+
+            // Create the output file
+            std::ofstream outFile(outputFilename, std::ios::binary);
+
+            if (!outFile) {
+                std::cerr << "Error opening file for writing: " << filename << std::endl;
+                continue;
+            }
+
+            if (comp) { // Write the header in the compressed file
+                size_t nblocks = pairs[0].first.nblocks;
+                outFile.write(reinterpret_cast<char*>(&nblocks), sizeof(size_t));
+
+                for (const auto& [metaBlock, _] : pairs) {
+                    outFile.write(reinterpret_cast<const char*>(&metaBlock.size), sizeof(size_t));
+                    outFile.write(reinterpret_cast<const char*>(&metaBlock.cmp_size), sizeof(size_t));
+                }
+            }
+
+            // Write the data
+            for (const auto& [_, data] : pairs) {
+                outFile.write(data.data(), data.size());
+            }
+
+            outFile.close(); 
+
+            // Remove original file if flag is set
+            if (REMOVE_ORIGIN) {
+                unlink(filename.c_str());
+            }
+        }
+    } else {
         // The workers receive the metadata and the data from the master -------------------------------------------------------------------
         while (true) {
             // First probe for the message
@@ -316,12 +389,56 @@ int main(int argc, char *argv[]) {
                 std::fprintf(stderr, "Worker %d received data block: size %zu\n", myId, receivedData.size());
             }
 
-            // Process the data block
-            if (comp) { //TODO: do this
+            // Process the data block (compress or decompress) -----------------------------------------------------------------------------
+            size_t size = receivedMetaBlock.size;
+            size_t cmp_size = receivedMetaBlock.cmp_size;
+
+            std::vector<char> sendData;
+
+            if (comp) { 
+                // get an estimation of the maximum compression size
+                unsigned long cmp_len = compressBound(size);
+
+                // allocate memory to store compressed data in memory
+                unsigned char *ptrOut = new unsigned char[cmp_len];
+
+                // compress the data
+                if (compress(ptrOut, &cmp_len, reinterpret_cast<unsigned char*>(receivedData.data()), size) != Z_OK) {
+                    std::cerr << "Process " << myId << " failed to compress the data" << std::endl;
+                    delete [] ptrOut;
+                    MPI_Abort(MPI_COMM_WORLD, -1);
+                }
+
+                if (QUITE_MODE >= 2) {
+                    std::fprintf(stderr, "Worker %d has compressed the block %zu of file %s.\n", myId, receivedMetaBlock.blockid, receivedMetaBlock.filename);
+                }
+
+                // update cmp_size to cmp_len in receivedMetaBlock and save compressed data in the sendData vector
+                receivedMetaBlock.cmp_size = cmp_len;
+                std::memcpy(sendData.data(), ptrOut, cmp_len);
 
             } else {
+                // allocate memory to store decompressed data in memory (cmp_size is the size of the original block)
+                unsigned char *ptrOut = new unsigned char[cmp_size];
 
+                // decompress the data
+                if (uncompress(ptrOut, &cmp_size, reinterpret_cast<unsigned char*>(receivedData.data()), size) != Z_OK) {
+                    std::cerr << "Process " << myId << " failed to decompress the data" << std::endl;
+                    delete [] ptrOut;
+                    MPI_Abort(MPI_COMM_WORLD, -1);
+                }
+
+                if (QUITE_MODE >= 2) {
+                    std::fprintf(stderr, "Worker %d has decompressed the block %zu of file %s.\n", myId, receivedMetaBlock.blockid, receivedMetaBlock.filename);
+                }
+
+                // save decompressed data in the sendData vector
+                std::memcpy(sendData.data(), ptrOut, cmp_size);
             }
+
+            // Send the metadata and the data back to the master ---------------------------------------------------------------------------
+            MPI_Send(&receivedMetaBlock, 1, MPI_MetaBlock, 0, 0, MPI_COMM_WORLD);
+            MPI_Send(sendData.data(), sendData.size(), MPI_CHAR, 0, 0, MPI_COMM_WORLD);
         }
     }
 
@@ -332,6 +449,9 @@ int main(int argc, char *argv[]) {
     if(!myId){
     	std::cout << "Elapsed time: " << end_time - start_time << " s\n" << std::endl;
 	}
+
+    //TODO: Free the MPI datatype for MetaBlock and clear the vectors??????
+    //MPI_Type_free(&MPI_MetaBlock);
 
     MPI_Finalize();
     return 0;
