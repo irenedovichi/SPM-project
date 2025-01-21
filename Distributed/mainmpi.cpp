@@ -415,7 +415,9 @@ int main(int argc, char *argv[]) {
 
                 // update cmp_size to cmp_len in receivedMetaBlock and save compressed data in the sendData vector
                 receivedMetaBlock.cmp_size = cmp_len;
+                sendData.resize(cmp_len);
                 std::memcpy(sendData.data(), ptrOut, cmp_len);
+                delete [] ptrOut;
 
             } else {
                 // allocate memory to store decompressed data in memory (cmp_size is the size of the original block)
@@ -433,7 +435,9 @@ int main(int argc, char *argv[]) {
                 }
 
                 // save decompressed data in the sendData vector
+                sendData.resize(cmp_size);
                 std::memcpy(sendData.data(), ptrOut, cmp_size);
+                delete [] ptrOut;
             }
 
             // Send the metadata and the data back to the master ---------------------------------------------------------------------------
