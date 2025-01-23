@@ -79,9 +79,12 @@ int main(int argc, char *argv[]) {
     MPI_Bcast(&comp, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
     MPI_Bcast(&BIGFILE_LOW_THRESHOLD, 1, MPI_LONG, 0, MPI_COMM_WORLD);
     MPI_Bcast(&QUITE_MODE, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    
-    //TODO: put a barrier before the timer starts????? --> MPI_Barrier(MPI_COMM_WORLD);
+
+    // Vector to store the pairs of (MetaBlock, data) to send back to the master
+    std::vector<std::pair<MetaBlock, std::vector<char>>> pairs;
+
     // Start the timer
+    MPI_Barrier(MPI_COMM_WORLD);
     double start_time = MPI_Wtime();
 
     if (!myId) {
@@ -440,9 +443,17 @@ int main(int argc, char *argv[]) {
                 delete [] ptrOut;
             }
 
-            // Send the metadata and the data back to the master ---------------------------------------------------------------------------
-            MPI_Send(&receivedMetaBlock, 1, MPI_MetaBlock, 0, 0, MPI_COMM_WORLD);
-            MPI_Send(sendData.data(), sendData.size(), MPI_CHAR, 0, 0, MPI_COMM_WORLD);
+            // Store the metadata and the data in a pair
+            std::pair<MetaBlock, std::vector<char>> pair = {receivedMetaBlock, sendData};
+
+            // Add the pair to the pairs vector
+            pairs.push_back(pair);
+        }
+
+        // Send the metadata and the data in pairs back to the master ----------------------------------------------------------------------
+        for (const auto& [metaBlock, data] : pairs) {
+            MPI_Send(&metaBlock, 1, MPI_MetaBlock, 0, 0, MPI_COMM_WORLD);
+            MPI_Send(data.data(), data.size(), MPI_CHAR, 0, 0, MPI_COMM_WORLD);
         }
     }
 
@@ -453,9 +464,6 @@ int main(int argc, char *argv[]) {
     if(!myId){
     	std::cout << "Elapsed time: " << end_time - start_time << " s\n" << std::endl;
 	}
-
-    //TODO: Free the MPI datatype for MetaBlock and clear the vectors??????
-    //MPI_Type_free(&MPI_MetaBlock);
 
     MPI_Finalize();
     return 0;
