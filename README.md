@@ -7,16 +7,26 @@ In this project, a file compression and decompression program was developed usin
 ## Project Structure
 ```
 ./
-├── 📂 
-│   ├── 📄 
-│   ├── 📄 
-│   └── 📄 
-├── 📂 
-│   ├── 📄 
-│   └── 📄 
-├── 📄 
-├── 📄 
-└── 📄 
+├── 📂 Distributed
+│   ├── 📄 Makefile
+│   ├── 📄 cmdline_mpi.hpp
+│   ├── 📄 mainmpi.cpp
+│   └── 📄 utility_mpi.hpp
+├── 📂 Sequential
+│   ├── 📄 Makefile
+│   ├── 📄 cmdline_seq.hpp
+│   ├── 📄 mainseq.cpp
+│   └── 📄 utility_seq.hpp
+├── 📂 SharedMemory
+│   ├── 📄 Makefile
+│   ├── 📄 cmdline_ff.hpp
+│   ├── 📄 mainff.cpp
+│   └── 📄 utility_ff.hpp
+├── 📂 miniz 
+├── 📂 shellscripts
+├── 📂 src
+│   └── 📄 file_generator.py
+└── 📄 plots.ipynb
 ```
 ### Sequential Implementation
 To compile the code make sure that you are in the `Sequential` folder and use the provided Makefile:
@@ -49,3 +59,9 @@ make mainff
 ```
 
 ## Experiments
+The shell scripts that were used to test on the SPM Cluster Machine Backend nodes can be found in the `shellscripts` folder. 
+
+To run one of those script use:
+```
+sbatch [path-to-script]
+```
