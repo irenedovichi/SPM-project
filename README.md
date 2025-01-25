@@ -26,6 +26,7 @@ In this project, a file compression and decompression program was developed usin
 ├── 📂 shellscripts
 ├── 📂 src
 │   └── 📄 file_generator.py
+├── 📄 plots_decomp.ipynb
 └── 📄 plots.ipynb
 ```
 ### Sequential Implementation
