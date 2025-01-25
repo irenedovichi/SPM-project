@@ -4,3 +4,5 @@ src/data_original
 SharedMemory/datashared
 Distributed/datadistributed
 outputs
+SharedMemory/data_ff
+SharedMemory/data_strong2
