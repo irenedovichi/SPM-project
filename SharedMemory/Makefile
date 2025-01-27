@@ -7,7 +7,7 @@ endif
 
 CXX		    = g++ -std=c++20
 INCLUDES	= -I . -I miniz
-CXXFLAGS  	+= -Wall -DBLOCKING_MODE #-DNO_DEFAULT_MAPPING -DFF_BOUNDED_BUFFER -DDEFAULT_BUFFER_CAPACITY=512 
+CXXFLAGS  	+= -Wall -DNO_DEFAULT_MAPPING -DBLOCKING_MODE # without DNO_DEFAULT_MAPPING it gives error at runtime on my Mac
 
 LDFLAGS 	= -pthread
 OPTFLAGS	= -O3 -ffast-math -DNDEBUG
